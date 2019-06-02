@@ -1,0 +1,140 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[UTF8]{ctex}
+\usepackage{amsmath}%可选参数默认default
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{indentfirst}
+\usepackage[ruled,vlined]{algorithm2e}
+\usepackage{}
+
+\setlength{\parindent}{2em}
+\title{2019算法设计与分析课程报告  \\ 时间序列异常点的检测和修复}
+\author{1160300823  陈柯昊}
+\begin{document}
+\maketitle
+\section{论文介绍}
+我选择的是Time Series Data Cleaning: From Anomaly Detection to Anomaly Repairing，2017年VLDB的一篇文章。
+这篇文章最初吸引我是因为异常检测及修复对于时间数据的处理是一个很实际的场景，对数据进行合理的异常检测只是一个开端，
+正如文中所说，简单地删去异常数据会使得其他算法无法正常应用，
+所以一个准确、有效率的修复算法是很必要的。接近事实的数据修复也有助于其他算法的应用。
+\par
+文章的主要贡献有:
+\begin{enumerate}
+ \item 基于时间序列数据的迭代最小修复（IMR）的新框架
+ \item 对所提出的迭代最小修复的收敛的显式分析
+ \item 每次迭代中的参数的有效估计
+ \item 通过增量计算，将参数估计的复杂度从O（n）降低到O（1）   
+\end{enumerate}
+\subsection{论文背景}
+时间序列数据经常被发现具有脏或不精确的值，例如GPS轨迹，传感器读取序列[15]，
+甚至股票价格[16]。例如，SALVEPAR（SY）的价格被误用为SYBASE（SY）的价格，
+两者在某些来源中共享相同的符号（SY）。
+它与现实生活中实际发生的异常不同，例如，当冷空气涌入时，温度在一天内从$20C$突然变为$10C$。
+为了区分这类异常，我们提出采用一些标记的脏数据观察事实。
+\subsection{问题定义}
+考虑n个观察值的时间序列，$x=x[1], \ldots, x[n]$，
+其中每个$x[i]$是第$i$个数据点的值。为简洁起见，我们将$x[i]$写为$x_i$
+\par
+设y表示x的标记/修复序列。每个$y_i$都是标记的真值或$x_i$的修复值。
+\par
+给定时间序列x和部分标记的x的子集y，修复问题是确定未在y中标记的$x_i$的修复$y_i$。
+图表中给出了该论文中符号的定义:
+\begin{table}[h]
+    \centering
+    \begin{tabular}{@{}|c|c|@{}}
+    \toprule
+    符号        & 描述                     \\ \midrule
+    $x$       & n个数据点的观察序列             \\ \midrule
+    $x_i$     & $x$中第i个数据的值，也被写作$x[i]$ \\ \midrule
+    $y$       & 标记的真值/$x$的修复序列         \\ \midrule
+    $z$       & $x$与标记/修复的$y$的距离       \\ \midrule
+    $y^{(k)}$ & 第$k$次迭代的序列$y$          \\ \midrule
+    $\phi$    & $p$阶AR(p)/ARX(p)的参数    \\ \midrule
+    $\tau$    & 提前定义的收敛阈值              \\ \midrule
+    $Z,V$     & 参数估计的输入矩阵              \\ \midrule
+    $A,B$     & 参数估计的中间值矩阵             \\ \bottomrule
+    \end{tabular}
+    \caption{符号定义}
+\end{table}
+
+\subsection{算法介绍}
+本文中的修复算法与现有的修复算法不同，现有的修复算法可能通过一次修复过度修复数据，该文章提出逐步修复数据，并且注意到异常检测中的误差性质及数据修复中的最小变化原理，
+使得前一次迭代中的高可信度信息可以帮助后续步骤的修复，称为迭代最小修复法IMR,(Iterative Minimum Repairing)。
+\subsubsection{设计思想}
+设$y^{(k)}$表示第$k$次迭代中的序列$y$,其中$y^{(0)}$是输入中部分标记的时间序列。因为$y^{(0)}$是不完整的(部分标记的)，为了初始化，
+如果$y_{t}^{(0)}$是未标记的，则指定$y_{t}^{(0)} = x_t$。标记值不应该被修复，例如：在$y_{t}^{(0)}$被标记的情况下，$y_{t}^{(k)}=y_{t}^{(0)}$。
+\par
+算法1中描述了迭代最小修复过程IMR(p)，其输入是观察时间序列$x$，并且部分标记为$y^{(0)}$。它输出所有标记的$y_{t}^{(0)}$未改变且w未标记的$y_{t}^{(0)}$被修复的$y_{t}^{(0)}$。
+主要步骤包括：
+\begin{enumerate}
+    \item \textbf{参数估计},在第2行中，从$x$和当前$y^{(k)}$学习第$k$次迭代中的ARX（p）的参数，由$\phi(k)$表示。
+    \item \textbf{修复候选的产生},在第3行中，根据关于$x,y^{(k)},\phi(k)$的ARX(p)计算可能的修复$\hat{y}^{(k)}$。
+    \item \textbf{评估修复}，在第4行中，由数据修复中的最小更改原则确定要接受的修复之一，$y_{t}^{(k+1)}=\hat{y}_{t}^{(k)}$。如第5行所示，重复该过程，直到修复收敛。如$$\left|y_{j}^{(k)}-y_{j}^{(k+1)}\right| \leq \tau, j=1, \ldots, n$$其中$\tau$是收敛阈值，或达到最大迭代次数。
+\end{enumerate}
+
+\begin{algorithm}[h]
+\caption{IMR(p)}
+\LinesNumbered %要求显示行号
+\KwIn{ time series $x$ and partially labeled $y^{(0)}$}%输入参数
+\KwOut{$y^{(k)}$ with all the labeled $y_{i}^{(0)}$ unchanged and unlabeled $y_{j}^{(0)}$ repaired}%输出
+\For{$k \leftarrow 0$ to max-num-iterations}{
+    $\phi^{(k)} \leftarrow$ Estimate $\left(x, y^{(k)}\right);$\;
+    $\hat{y}^{(k)} \leftarrow$ Candidate $\left(x, y^{(k)}, \phi^{(k)}\right);$\;
+    $y^{(k+1)} \leftarrow$ Evaluate $\left(x, y^{(k)}, \hat{y}^{(k)}\right);$\;
+    \If{Converge $\left(y^{(k)}, y^{(k+1)}\right)$}{
+        break;\;
+    }
+    $k \leftarrow k+1$\;
+}
+return $y^{(k)}$
+\end{algorithm}
+\subsubsection{参数估计}
+\par
+在给定$x, y^{(k)}$的情况下，参数估计步骤1(算法1的第2行中)估计ARX(p)的参数$\phi(k)$。
+可以直接使用诸如普通最小二乘[20]或Yule-Walker方程[7]的现有方法。例如，通过普通最小二乘法，我们有
+$$\phi^{(k)}=\left(\left(Z^{(k)}\right)^{\prime} Z^{(k)}\right)^{-1}\left(Z^{(k)}\right)^{\prime} V^{(k)}$$
+\par
+其中
+$$ \boldsymbol{V}^{(k)}=\left( \begin{array}{c}{y_{p+1}^{(k)}-x_{p+1}} \\ {y_{p+2}^{(k)}-x_{p+2}} \\ {\vdots} \\ {y_{n}^{(k)}-x_{n}}\end{array}\right)$$，
+    $$\phi^{(k)}=\left( \begin{array}{c}{\phi_{1}^{(k)}} \\ {\phi_{2}^{(k)}} \\ {\vdots} \\ {\phi_{p}^{(k)}}\end{array}\right)$$，
+$$
+Z^{(k)}=\left( \begin{array}{cccc}{y_{p}^{(k)}-x_{p}} & {y_{p-1}^{(k)}-x_{p-1}} & {\dots} & {y_{1}^{(k)}-x_{1}} \\ {y_{p+1}^{(k)}-x_{p+1}} & {y_{p}^{(k)}-x_{p}} & {\dots} & {y_{2}^{(k)}-x_{2}} \\ {\vdots} & {\vdots} & {\ddots} & {\vdots} \\ {y_{n-1}^{(k)}-x_{n-1}} & {y_{n-2}^{(k)}-x_{n-2}} & {\dots} & {y_{n-p}^{(k)}-x_{n-p}}\end{array}\right)
+$$
+\par
+因为采用了迭代修复，在线增量参数估计是必要的，这在以前的研究中没有研究过。
+\subsubsection{修复候选的产生}
+修复候选者生成步骤2(在算法1的第3行中)使用ARX(p)根据估计参数$\phi^{(k)}$来推断候选修复$\hat{y}^{(k)}=\phi^{(k)} \cdot\left(y^{(k)}-x\right)+x$。
+更具体的说，对于每个点$t$，$\hat{y}_{t}^{(k)}$由下式给出
+$$\hat{y}_{t}^{(k)}=\sum_{i=1}^{p} \phi_{i}^{(k)}\left(y_{t-i}^{(k)}-x_{t-i}\right)+x_{t}$$
+\par
+根据$y_{t-1}^{(k)}, \ldots, y_{t-p}^{(k)}$。
+我们注意到，只有具有$\left|\hat{y}_{t}^{(k)}-y_{t}^{(k)}\right|>\tau$的候选者才需要考虑之前等式中的收敛条件。
+\subsubsection{评估修复}
+修复评估步骤3(在算法1的第4行中)选择一个修复来接受，即，为上述生成的修复候选分配$y_{t}^{(k+1)}=\hat{y}_{t}^{(k)}$。
+遵循数据修复中的最小变化原则，从其原始输入中最小化的修复是优选的，具有更高的置信度。每次迭代中修复的结果是：
+$$
+y_{t}^{(k+1)}=\left\{\begin{array}{ll}{\hat{y}_{t}^{(k)}} & {\text { if } t=\arg \min _{i}\left|\hat{y}_{i}^{(k)}-x_{i}\right|} \\ {y_{t}^{(k)}} & {\text { otherwise }}\end{array}\right.
+$$
+\par
+值得注意的是，在每次迭代中只修复了一个具有最小变化（最大限度）的数据点，这比最小化整体变化关于完整性约束的NP难问题更为有效。
+\par
+请注意，数据修复中的最小变化原则[1]基于人或系统总是试图最小化其错误的直觉。但是，不能保证最小变化修复总是对应于真实值。因此，类似于其他基于最小变化的数据修复研究[1,8]，
+最终结果的准确性不太可能具有理论上的保证，因为对于误差可能与事实偏离的程度没有限制。
+出于这个原因，我们只能通过与实验中的基本事实进行比较来评估修复的正确性，类似于其他数据修复研究[1,8]。然而，我们可以证明高效的修剪和增量计算是安全的，即理论上保证最终结果的准确性与原始IMR的结果相同，而不需要修剪和增量计算。
+\subsubsection{算法执行流程}
+\subsubsection{例子}
+\subsection{理论和实验结论}
+\section{领域综述}
+\subsection{领域背景}
+\subsection{方法介绍}
+\section{改进点概述}
+\section{算法与分析}
+\subsection{算法设计思想}
+\subsection{算法过程描述}
+\subsubsection{自然语言描述}
+\subsubsection{伪代码描述}
+\subsubsection{伪代码逐行解释}
+\subsubsection{例子}
+\subsection{算法的结果}
+\end{document}
+
