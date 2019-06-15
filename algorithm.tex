@@ -4,8 +4,10 @@
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{indentfirst}
+\usepackage{amsthm}
 \usepackage[ruled,vlined]{algorithm2e}
 \usepackage{}
+\newtheorem{proposition}{{命题}} 
 
 \setlength{\parindent}{2em}
 \title{2019算法设计与分析课程报告  \\ 时间序列异常点的检测和修复}
@@ -13,7 +15,7 @@
 \begin{document}
 \maketitle
 \section{论文介绍}
-我选择的是Time Series Data Cleaning: From Anomaly Detection to Anomaly Repairing，2017年VLDB的一篇文章。
+我选择的是Time Series Data Cleaning: From Anomaly Detection to Anomaly Repairing，2017年在VLDB发表的一篇文章。
 这篇文章最初吸引我是因为异常检测及修复对于时间数据的处理是一个很实际的场景，对数据进行合理的异常检测只是一个开端，
 正如文中所说，简单地删去异常数据会使得其他算法无法正常应用，
 所以一个准确、有效率的修复算法是很必要的。接近事实的数据修复也有助于其他算法的应用。
@@ -69,7 +71,11 @@
 \begin{enumerate}
     \item \textbf{参数估计},在第2行中，从$x$和当前$y^{(k)}$学习第$k$次迭代中的ARX（p）的参数，由$\phi(k)$表示。
     \item \textbf{修复候选的产生},在第3行中，根据关于$x,y^{(k)},\phi(k)$的ARX(p)计算可能的修复$\hat{y}^{(k)}$。
-    \item \textbf{评估修复}，在第4行中，由数据修复中的最小更改原则确定要接受的修复之一，$y_{t}^{(k+1)}=\hat{y}_{t}^{(k)}$。如第5行所示，重复该过程，直到修复收敛。如$$\left|y_{j}^{(k)}-y_{j}^{(k+1)}\right| \leq \tau, j=1, \ldots, n$$其中$\tau$是收敛阈值，或达到最大迭代次数。
+    \item \textbf{评估修复}，在第4行中，由数据修复中的最小更改原则确定要接受的修复之一，$y_{t}^{(k+1)}=\hat{y}_{t}^{(k)}$。如第5行所示，重复该过程，直到修复收敛。如
+\begin{equation}
+\left|y_{j}^{(k)}-y_{j}^{(k+1)}\right| \leq \tau, j=1, \ldots, n
+\end{equation}
+其中$\tau$是收敛阈值，或达到最大迭代次数。
 \end{enumerate}
 
 \begin{algorithm}[h]
@@ -92,35 +98,72 @@ return $y^{(k)}$
 \par
 在给定$x, y^{(k)}$的情况下，参数估计步骤1(算法1的第2行中)估计ARX(p)的参数$\phi(k)$。
 可以直接使用诸如普通最小二乘[20]或Yule-Walker方程[7]的现有方法。例如，通过普通最小二乘法，我们有
-$$\phi^{(k)}=\left(\left(Z^{(k)}\right)^{\prime} Z^{(k)}\right)^{-1}\left(Z^{(k)}\right)^{\prime} V^{(k)}$$
+\begin{equation}
+\phi^{(k)}=\left(\left(Z^{(k)}\right)^{\prime} Z^{(k)}\right)^{-1}\left(Z^{(k)}\right)^{\prime} V^{(k)}
+\end{equation}
 \par
 其中
-$$ \boldsymbol{V}^{(k)}=\left( \begin{array}{c}{y_{p+1}^{(k)}-x_{p+1}} \\ {y_{p+2}^{(k)}-x_{p+2}} \\ {\vdots} \\ {y_{n}^{(k)}-x_{n}}\end{array}\right)$$，
-    $$\phi^{(k)}=\left( \begin{array}{c}{\phi_{1}^{(k)}} \\ {\phi_{2}^{(k)}} \\ {\vdots} \\ {\phi_{p}^{(k)}}\end{array}\right)$$，
-$$
+\begin{equation}
+\boldsymbol{V}^{(k)}=\left( \begin{array}{c}{y_{p+1}^{(k)}-x_{p+1}} \\ {y_{p+2}^{(k)}-x_{p+2}} \\ {\vdots} \\ {y_{n}^{(k)}-x_{n}}\end{array}\right)
+\end{equation}
+，
+\begin{equation}
+    \phi^{(k)}=\left( \begin{array}{c}{\phi_{1}^{(k)}} \\ {\phi_{2}^{(k)}} \\ {\vdots} \\ {\phi_{p}^{(k)}}\end{array}\right)
+\end{equation}，
+\begin{equation}
 Z^{(k)}=\left( \begin{array}{cccc}{y_{p}^{(k)}-x_{p}} & {y_{p-1}^{(k)}-x_{p-1}} & {\dots} & {y_{1}^{(k)}-x_{1}} \\ {y_{p+1}^{(k)}-x_{p+1}} & {y_{p}^{(k)}-x_{p}} & {\dots} & {y_{2}^{(k)}-x_{2}} \\ {\vdots} & {\vdots} & {\ddots} & {\vdots} \\ {y_{n-1}^{(k)}-x_{n-1}} & {y_{n-2}^{(k)}-x_{n-2}} & {\dots} & {y_{n-p}^{(k)}-x_{n-p}}\end{array}\right)
-$$
+\end{equation}
 \par
 因为采用了迭代修复，在线增量参数估计是必要的，这在以前的研究中没有研究过。
 \subsubsection{修复候选的产生}
 修复候选者生成步骤2(在算法1的第3行中)使用ARX(p)根据估计参数$\phi^{(k)}$来推断候选修复$\hat{y}^{(k)}=\phi^{(k)} \cdot\left(y^{(k)}-x\right)+x$。
 更具体的说，对于每个点$t$，$\hat{y}_{t}^{(k)}$由下式给出
-$$\hat{y}_{t}^{(k)}=\sum_{i=1}^{p} \phi_{i}^{(k)}\left(y_{t-i}^{(k)}-x_{t-i}\right)+x_{t}$$
+\begin{equation}
+\hat{y}_{t}^{(k)}=\sum_{i=1}^{p} \phi_{i}^{(k)}\left(y_{t-i}^{(k)}-x_{t-i}\right)+x_{t}
+\end{equation}
 \par
-根据$y_{t-1}^{(k)}, \ldots, y_{t-p}^{(k)}$。
+根据$y_{t-1}^{(k)}, \ldots, y_{t-p}^{(k)}$。	
 我们注意到，只有具有$\left|\hat{y}_{t}^{(k)}-y_{t}^{(k)}\right|>\tau$的候选者才需要考虑之前等式中的收敛条件。
 \subsubsection{评估修复}
 修复评估步骤3(在算法1的第4行中)选择一个修复来接受，即，为上述生成的修复候选分配$y_{t}^{(k+1)}=\hat{y}_{t}^{(k)}$。
 遵循数据修复中的最小变化原则，从其原始输入中最小化的修复是优选的，具有更高的置信度。每次迭代中修复的结果是：
-$$
-y_{t}^{(k+1)}=\left\{\begin{array}{ll}{\hat{y}_{t}^{(k)}} & {\text { if } t=\arg \min _{i}\left|\hat{y}_{i}^{(k)}-x_{i}\right|} \\ {y_{t}^{(k)}} & {\text { otherwise }}\end{array}\right.
-$$
+\begin{equation}
+y_{t}^{(k+1)}=\left\{\begin{array}{ll}{\hat{y}_{t}^{(k)}} & {\text { if } t=\arg \min _{i}\left|\hat{y}_{i}^{(k)}-x_{i}\right|} \\ {y_{t}^{(k)}} & {\text { otherwise }}\end{array}\right. \end{equation}
 \par
 值得注意的是，在每次迭代中只修复了一个具有最小变化（最大限度）的数据点，这比最小化整体变化关于完整性约束的NP难问题更为有效。
 \par
-请注意，数据修复中的最小变化原则[1]基于人或系统总是试图最小化其错误的直觉。但是，不能保证最小变化修复总是对应于真实值。因此，类似于其他基于最小变化的数据修复研究[1,8]，
-最终结果的准确性不太可能具有理论上的保证，因为对于误差可能与事实偏离的程度没有限制。
+数据修复中的最小变化原则[1]基于人或系统总是试图最小化其错误的直觉。但是，不能保证最小变化修复总是对应于真实值。因此，类似于其他基于最小变化的数据修复研究[1,8]，最终结果的准确性不太可能具有理论上的保证，因为对于误差可能与事实偏离的程度没有限制。
 出于这个原因，我们只能通过与实验中的基本事实进行比较来评估修复的正确性，类似于其他数据修复研究[1,8]。然而，我们可以证明高效的修剪和增量计算是安全的，即理论上保证最终结果的准确性与原始IMR的结果相同，而不需要修剪和增量计算。
+\par
+文章随后对算法的收敛性进行了分析，这一部分被我进行了略过的处理，因为难度有些大，不是很容易理解。
+\par
+在算法1的三个主要步骤中，虽然修复候选生成和评估对于最小修复是不可避免的，
+但具有高昂代价的的参数$\phi(k)$估计在迭代修复场景中是可以优化的。
+首先，我们确定参数估计的矩阵$Z^{(k)}, V^{(k)}$可以通过简单地删除值为0的行来修剪。此外，可以设计增量计算，使得参数估计的复杂度从O（n）减少到O（1）。
+\subsubsection{矩阵修剪}
+回忆一下在算法1中估计参数$\phi^{(k)}$时，我们需要分别考虑两个大矩阵$Z^{(k)}$和$\boldsymbol{V}^{(k)}$，$Z^{(k)}$和$\boldsymbol{V}^{(k)}$中的值$y_{i}^{(k)}-x_{i}$表示标记/修复值$y_{i}^{(k)}$与点$i$的输入值$\mathcal{X}_{i}$之间的差。
+在实践中，标记数据通常是有限的，而根据修复的最小变化原则，修复数据不应该有显着的改变。也就是说，$Z^{(k)}$和$\boldsymbol{V}^{(k)}$中的大多数值等于0。稀疏矩阵只要通过删除掉存在0的行就可以完成修剪。
+\par
+简单起见，令$z_{i}^{(k)}=y_{i}^{(k)}-x_{i}$。我们把算法1中的式子重写如下。
+\begin{equation}
+\boldsymbol{V}^{(k)}=\left(\begin{array}{c}{z_{p+1}^{(k)}} \\ {z_{p+2}^{(k)}} \\ {\vdots} \\ {z_{n}^{(k)}}\end{array}\right)
+\end{equation}
+
+\begin{equation}
+Z^{(k)}=\left(\begin{array}{ccc}{z_{p}^{(k)}} & {\dots} & {z_{1}^{(k)}} \\ {z_{p+1}^{(k)}} & {\cdots} & {z_{2}^{(k)}} \\ {\vdots} & {\ddots} & {\vdots} \\ {z_{n-1}^{(k)}} & {\cdots} & {z_{n-p}^{(k)}}\end{array}\right)
+\end{equation}
+
+去除$Z^{(k)}$中的值（其值等于0）和$\boldsymbol{V}^{(k)}$中的相应行之后，仍然可以计算相同的参数$\phi(k)$。
+\begin{proposition} 
+对于$Z^{(k)}$中的任一行，用$Z_{r}^{(k)}$来表示，如果整行全都为0，即$z_{r+p-1}^{(k)}=z_{r+p-2}^{(k)}=\ldots=z_{r}^{(k)}=0$，那么分别从$Z^{(k)}$和$\boldsymbol{V}^{(k)}$中删除行$Z_{r}^{(k)}$和对应的行$\boldsymbol{V}_{r}^{(k)}=\left(z_{p+r}^{(k)}\right)$是安全的，即计算的是同一个参数$\phi(k)$。
+\end{proposition} 
+
+
+\subsubsection{增量计算}
+在算法1的每次迭代中，参数$\phi(k)$都在等式2中在n个点上通过$Z^{(k)}$和$\boldsymbol{V}^{(k)}$来进行估计。但是根据修复最小变化原理，每次迭代中只有一点$r$被改变，即$y_{r}^{(k)} \neq y_{r}^{(k-1)}$。这就是说，$Z^{(k)}$和$\boldsymbol{V}^{(k)}$中大部分的点都是没有被改变的，与$Z^{(k-1)}$和$\boldsymbol{V}(k-1)$的值是相同的。在下面的命题中，我们说明了参数$\phi(k)$是可以通过只考虑变化值而非整个$Z^{(k)}$和$\boldsymbol{V}^{(k)}$来进行估计。因此，每次迭代中的时间复杂度从线性时间降低到了常数时间。
+\par
+
+
 \subsubsection{算法执行流程}
 \subsubsection{例子}
 \subsection{理论和实验结论}
@@ -128,6 +171,8 @@ $$
 \subsection{领域背景}
 \subsection{方法介绍}
 \section{改进点概述}
+\subsection{stream and multi-varite}
+在实际应用中,时间序列往往以多维度、数据流的形式出现，这就要求本文中的算法是一个在线算法，并且
 \section{算法与分析}
 \subsection{算法设计思想}
 \subsection{算法过程描述}
